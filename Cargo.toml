@@ -1,0 +1,10 @@
+[package]
+name = "dfc"
+version = "0.1.0"
+authors = ["Sascha Grunert <mail@saschagrunert.de>"]
+
+[dependencies]
+libc = "0"
+
+#[lib]
+#crate-type = ["staticlib", "rlib"]
