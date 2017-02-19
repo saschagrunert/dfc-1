@@ -36,6 +36,12 @@ type PID_TYPE = u32;
 type PID_CNT_TYPE = u32;
 type BUC_CNT_TYPE = u32;
 
+type DTYPE = u16;
+type BTYPE = u16;
+
+macro_rules! BINDEX { ($x:expr) => ($x >> 3) }
+macro_rules! BMASK { ($x:expr) => (1 << (($x) & 0x7)) }
+
 struct DFC_STRUCTURE {
     init_hash: *mut *const DFC_PATTERN,
     dfcPatterns: *mut DFC_PATTERN,
@@ -148,7 +154,7 @@ enum dfcDataType {
     DFC_CT_Type_2_8B_Array,
 }
 
-unsafe fn DFC_new() -> *mut DFC_STRUCTURE {
+unsafe fn DFC_New() -> *mut DFC_STRUCTURE {
     init_xlatcase();
 
     dfc_total_memory = 0;
@@ -365,28 +371,122 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
     unimplemented!()
 }
 
-unsafe fn Verification_CT1() -> i32 {
+unsafe fn Verification_CT1(dfc: *const DFC_STRUCTURE,
+                           buf: *const u8,
+                           matches: u32,
+                           match_fn: fn(*const u8, *const u32, usize),
+                           starting_point: *const u8)
+                           -> u32 {
+
     unimplemented!()
 }
 
-unsafe fn Verification_CT2() -> i32 {
+unsafe fn Verification_CT2(dfc: *const DFC_STRUCTURE,
+                           buf: *const u8,
+                           matches: u32,
+                           match_fn: fn(*const u8, *const u32, usize),
+                           starting_point: *const u8)
+                           -> u32 {
     unimplemented!()
 }
 
-unsafe fn Verification_CT4_7() -> i32 {
+unsafe fn Verification_CT4_7(dfc: *const DFC_STRUCTURE,
+                             buf: *const u8,
+                             matches: u32,
+                             match_fn: fn(*const u8, *const u32, usize),
+                             starting_point: *const u8)
+                             -> u32 {
     unimplemented!()
 }
 
-unsafe fn Verification_CT8_plus() -> i32 {
+unsafe fn Verification_CT8_plus(dfc: *const DFC_STRUCTURE,
+                                buf: *const u8,
+                                matches: u32,
+                                match_fn: fn(*const u8, *const u32, usize),
+                                starting_point: *const u8)
+                                -> u32 {
     unimplemented!()
 }
 
-unsafe fn Progressive_Filtering() -> i32 {
-    unimplemented!()
+unsafe fn Progressive_Filtering(dfc: *const DFC_STRUCTURE,
+                                buf: *const u8,
+                                mut matches: u32,
+                                idx: BTYPE,
+                                msk: BTYPE,
+                                match_fn: fn(*const u8, *const u32, usize),
+                                starting_point: *const u8,
+                                rest_len: usize)
+                                -> u32 {
+
+    if (*dfc).cDF0[*buf.offset(-2) as usize] != 0 {
+        matches = Verification_CT1(dfc, buf, matches, match_fn, starting_point);
+    }
+
+    if (*dfc).cDF1[idx as usize] & msk as u8 != 0 {
+        matches = Verification_CT2(dfc, buf, matches, match_fn, starting_point);
+    }
+
+    if rest_len >= 4 {
+        let data = *(buf) as u16;
+        let index = BINDEX!(data);
+        let mask = BMASK!(data);
+
+        if mask & (*dfc).ADD_DF_4_plus[index as usize] != 0 {
+            if mask & (*dfc).ADD_DF_4_1[index as usize] != 0 {
+                matches = Verification_CT4_7(dfc, buf, matches, match_fn, starting_point);
+            }
+
+            if rest_len >= 8 {
+                matches = Verification_CT8_plus(dfc, buf, matches, match_fn, starting_point);
+            }
+        }
+    }
+
+    matches
 }
 
-unsafe fn DFC_Search() -> i32 {
-    unimplemented!()
+unsafe fn DFC_Search(dfc: *const DFC_STRUCTURE,
+                     buf: *const u8,
+                     buflen: usize,
+                     match_fn: fn(*const u8, *const u32, usize))
+                     -> u32 {
+    let mut matches = 0;
+
+    if buflen <= 0 {
+        return 0;
+    }
+
+    let DirectFilter1 = (*dfc).DirectFilter1;
+
+    for i in 0..buflen - 1 {
+        let data = *(buf.offset(i as isize)) as u16;
+        let index = BINDEX!(data);
+        let mask = BMASK!(data);
+
+        if DirectFilter1[index as usize] & mask as u8 != 0 {
+            matches = Progressive_Filtering(dfc,
+                                            buf.offset(i as isize + 2),
+                                            matches,
+                                            index,
+                                            mask,
+                                            match_fn,
+                                            buf,
+                                            buflen - i);
+        }
+    }
+
+    // It is needed to check last 1 byte from payload
+    if (*dfc).cDF0[*buf.offset(buflen as isize - 1) as usize] != 0 {
+        for i in 0..(*dfc).CompactTable1[*buf.offset(buflen as isize - 1) as usize].cnt {
+            let pid = (*dfc).CompactTable1[*buf.offset(buflen as isize - 1) as usize].pid[i as usize];
+            let mlist = *(*dfc).dfcMatchList.offset(pid as isize);
+
+            match_fn((*mlist).casepatrn, (*mlist).sids, (*mlist).sids_size);
+            matches += 1;
+        }
+    }
+
+    matches
 }
 
 fn my_sqrtf(input: f32, mut x: f32) -> f32 {
