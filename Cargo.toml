@@ -5,3 +5,4 @@ authors = ["Sebastian Spieß and Sascha Grunert"]
 
 [dependencies]
 libc = "0"
+crc = "1"
