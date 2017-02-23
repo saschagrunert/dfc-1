@@ -318,7 +318,7 @@ pub unsafe fn DFC_FreeStructure(dfc: *mut DFC_STRUCTURE) {
     free(dfc as *mut c_void);
 }
 
-pub unsafe fn DFC_AddPattern(dfc: *mut DFC_STRUCTURE, pat: *const u8, n: isize, nocase: bool, sid: PID_TYPE) -> i32 {
+pub unsafe fn DFC_AddPattern(dfc: *mut DFC_STRUCTURE, pat: *const u8, n: usize, nocase: bool, sid: PID_TYPE) -> i32 {
     let mut plist: *mut DFC_PATTERN = DFC_InitHashLookup(dfc, pat, n as u16);
 
     if plist.is_null() {
@@ -326,17 +326,17 @@ pub unsafe fn DFC_AddPattern(dfc: *mut DFC_STRUCTURE, pat: *const u8, n: isize, 
                            dfcMemoryType::DFC_MEMORY_TYPE__PATTERN) as *mut DFC_PATTERN;
         memset(plist as *mut c_void, 0, size_of::<DFC_PATTERN>());
 
-        (*plist).patrn = DFC_MALLOC(n as usize, dfcMemoryType::DFC_MEMORY_TYPE__PATTERN) as *mut u8;
+        (*plist).patrn = DFC_MALLOC(n, dfcMemoryType::DFC_MEMORY_TYPE__PATTERN) as *mut u8;
         memassert_dfc!((*plist).patrn, "DFC_AddPattern");
 
         ConvertCaseEx((*plist).patrn, pat, n);
 
-        (*plist).casepatrn = DFC_MALLOC(n as usize, dfcMemoryType::DFC_MEMORY_TYPE__PATTERN) as *mut u8;
+        (*plist).casepatrn = DFC_MALLOC(n, dfcMemoryType::DFC_MEMORY_TYPE__PATTERN) as *mut u8;
         memassert_dfc!((*plist).casepatrn, "DFC_AddPattern");
 
-        memcpy((*plist).casepatrn as *mut c_void, pat as *const c_void, n as usize);
+        memcpy((*plist).casepatrn as *mut c_void, pat as *const c_void, n);
 
-        (*plist).n = n as usize;
+        (*plist).n = n;
         (*plist).nocase = nocase;
         (*plist).iid = (*dfc).numPatterns; // internal id
         (*plist).next = null_mut();
@@ -390,7 +390,7 @@ unsafe fn Add_PID_to_2B_CT(CompactTable: *const CT_Type_2_2B,
 
 }
 
-unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
+pub unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
     let i: u32 = 0;
     let mut alpha_cnt: u32 = 0;
 
@@ -442,7 +442,8 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
     (*dfc).init_hash = null_mut();
 
     (*dfc).dfcMatchList = DFC_MALLOC(size_of::<DFC_PATTERN>() * ((*dfc).numPatterns as usize),
-                                     dfcMemoryType::DFC_MEMORY_TYPE__PATTERN) as *mut *const DFC_PATTERN;
+                                     dfcMemoryType::DFC_MEMORY_TYPE__PATTERN) as
+                          *mut *const DFC_PATTERN;
     memassert_dfc!((*dfc).dfcMatchList, "DFC_Compile");
 
     plist = (*dfc).dfcPatterns;
@@ -469,7 +470,9 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
 
     pattern_interval = 32;
     min_pattern_interval = 32;
-    memset(((*dfc).CompactTable1).as_mut_ptr() as *mut c_void, 0, size_of::<CT_Type_1>() * CT1_TABLE_SIZE as usize);
+    memset(((*dfc).CompactTable1).as_mut_ptr() as *mut c_void,
+           0,
+           size_of::<CT_Type_1>() * CT1_TABLE_SIZE as usize);
 
     plist = (*dfc).dfcPatterns;
     while !plist.is_null() {
@@ -494,7 +497,8 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
                     }
                     if k == (*dfc).CompactTable1[temp[0] as usize].cnt {
                         (*dfc).CompactTable1[temp[0] as usize].cnt += 1;
-                        (*dfc).CompactTable1[temp[0] as usize].pid[(*dfc).CompactTable1[temp[0] as usize].cnt as usize] = (*plist).iid;
+                        (*dfc).CompactTable1[temp[0] as usize].pid[(*dfc).CompactTable1[temp[0] as usize].cnt as
+                        usize] = (*plist).iid;
                         if (*dfc).CompactTable1[temp[0] as usize].cnt >= CT_TYPE1_PID_CNT_MAX as u16 {
                             println!("Too many PIDs in CT1. You should expand the size.")
                         }
@@ -519,7 +523,7 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
                 }
 
                 (*dfc).cDF0[temp[0] as usize] = 1;
-                if (*dfc).CompactTable1[temp[0] as usize].cnt  == 0 {
+                if (*dfc).CompactTable1[temp[0] as usize].cnt == 0 {
                     (*dfc).CompactTable1[temp[0] as usize].cnt += 1;
                     (*dfc).CompactTable1[temp[0] as usize].pid[0] = (*plist).iid;
                 } else {
@@ -529,7 +533,8 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
                         }
                         if k == (*dfc).CompactTable1[temp[0] as usize].cnt {
                             (*dfc).CompactTable1[temp[0] as usize].cnt += 1;
-                            (*dfc).CompactTable1[temp[0] as usize].pid[(*dfc).CompactTable1[temp[0] as usize].cnt as usize] = (*plist).iid;
+                            (*dfc).CompactTable1[temp[0] as usize].pid[(*dfc).CompactTable1[temp[0] as usize]
+                                .cnt as usize] = (*plist).iid;
                             if (*dfc).CompactTable1[temp[0] as usize].cnt >= CT_TYPE1_PID_CNT_MAX as u16 {
                                 println!("Too many PIDs in CT1. You should expand the size.");
                             }
@@ -541,7 +546,8 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
         if (*plist).n > 1 {
             alpha_cnt = 0;
 
-            while alpha_cnt < 4 {} {
+            while alpha_cnt < 4 {}
+            {
                 j = 1;
                 k = 0;
                 while j >= 0 {
@@ -553,19 +559,35 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
                 if (*plist).n == 2 || (*plist).n == 3 {
                     k = 0;
                     for j in ((*plist).n)..((*plist).n - 2) {
-                        Build_pattern(plist, flag.as_mut_ptr(), temp.as_mut_ptr(), i, j as isize, k);
+                        Build_pattern(plist,
+                                      flag.as_mut_ptr(),
+                                      temp.as_mut_ptr(),
+                                      i,
+                                      j as isize,
+                                      k);
                         k += 1;
                     }
                 } else if (*plist).n < 8 {
                     k = 0;
-                    for j in ((*plist).n -4)..((*plist).n - 2) {
-                        Build_pattern(plist, flag.as_mut_ptr(), temp.as_mut_ptr(), i, j as isize, k);
+                    for j in ((*plist).n - 4)..((*plist).n - 2) {
+                        Build_pattern(plist,
+                                      flag.as_mut_ptr(),
+                                      temp.as_mut_ptr(),
+                                      i,
+                                      j as isize,
+                                      k);
                         k += 1;
                     }
                 } else {
                     k = 0;
-                    for j in (min_pattern_interval * ((*plist).n - 8) / pattern_interval)..(min_pattern_interval * ((*plist).n - 8) / pattern_interval + 2) {
-                        Build_pattern(plist, flag.as_mut_ptr(), temp.as_mut_ptr(), i, j as isize, k);
+                    for j in (min_pattern_interval * ((*plist).n - 8) / pattern_interval)..
+                             (min_pattern_interval * ((*plist).n - 8) / pattern_interval + 2) {
+                        Build_pattern(plist,
+                                      flag.as_mut_ptr(),
+                                      temp.as_mut_ptr(),
+                                      i,
+                                      j as isize,
+                                      k);
                         k += 1;
                     }
                 }
@@ -584,7 +606,8 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
         if (*plist).n >= 4 {
             alpha_cnt = 0;
 
-            while alpha_cnt < 16 {} {
+            while alpha_cnt < 16 {}
+            {
                 j = 3;
                 k = 0;
                 while j >= 0 {
@@ -595,13 +618,24 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
                 if (*plist).n < 8 {
                     k = 0;
                     for j in ((*plist).n - 4)..((*plist).n) {
-                        Build_pattern(plist, flag.as_mut_ptr(), temp.as_mut_ptr(), i, j as isize, k);
+                        Build_pattern(plist,
+                                      flag.as_mut_ptr(),
+                                      temp.as_mut_ptr(),
+                                      i,
+                                      j as isize,
+                                      k);
                         k += 1;
                     }
                 } else {
                     k = 0;
-                    for j in (min_pattern_interval * ((*plist).n - 8) / pattern_interval)..(min_pattern_interval * ((*plist).n - 8) / pattern_interval + 4) {
-                        Build_pattern(plist, flag.as_mut_ptr(), temp.as_mut_ptr(), i, j as isize, k);
+                    for j in (min_pattern_interval * ((*plist).n - 8) / pattern_interval)..
+                             (min_pattern_interval * ((*plist).n - 8) / pattern_interval + 4) {
+                        Build_pattern(plist,
+                                      flag.as_mut_ptr(),
+                                      temp.as_mut_ptr(),
+                                      i,
+                                      j as isize,
+                                      k);
                         k += 1;
                     }
                 }
@@ -623,7 +657,8 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
         if (*plist).n >= 8 {
             alpha_cnt = 0;
 
-            while alpha_cnt < 256 {} {
+            while alpha_cnt < 256 {}
+            {
                 j = 7;
                 k = 0;
                 while j >= 0 {
@@ -632,8 +667,14 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
                     k += 1;
                 }
                 k = 0;
-                for j in (min_pattern_interval * ((*plist).n - 8) / pattern_interval)..(min_pattern_interval * ((*plist).n - 8) / pattern_interval + 8) {
-                    Build_pattern(plist, flag.as_mut_ptr(), temp.as_mut_ptr(), i, j as isize, k);
+                for j in (min_pattern_interval * ((*plist).n - 8) / pattern_interval)..
+                         (min_pattern_interval * ((*plist).n - 8) / pattern_interval + 8) {
+                    Build_pattern(plist,
+                                  flag.as_mut_ptr(),
+                                  temp.as_mut_ptr(),
+                                  i,
+                                  j as isize,
+                                  k);
                     k += 1;
                 }
                 byteIndex = BINDEX!(*(temp.as_mut_ptr().offset(3) as *mut u16) & DF_MASK as u16) as u32;
@@ -652,18 +693,25 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
     }
 
     dfc_memory_ct2 += size_of::<CT_Type_2>() * CT2_TABLE_SIZE;
-    memset((*dfc).CompactTable2.as_mut_ptr() as *mut c_void, 0, size_of::<CT_Type_2>() * CT2_TABLE_SIZE);
+    memset((*dfc).CompactTable2.as_mut_ptr() as *mut c_void,
+           0,
+           size_of::<CT_Type_2>() * CT2_TABLE_SIZE);
 
     dfc_memory_ct4 += size_of::<CT_Type_2>() * CT4_TABLE_SIZE;
-    memset((*dfc).CompactTable4.as_mut_ptr() as *mut c_void, 0, size_of::<CT_Type_2>() * CT4_TABLE_SIZE);
+    memset((*dfc).CompactTable4.as_mut_ptr() as *mut c_void,
+           0,
+           size_of::<CT_Type_2>() * CT4_TABLE_SIZE);
 
     dfc_memory_ct8 += size_of::<CT_Type_2_8B>() * CT8_TABLE_SIZE;
-    memset((*dfc).CompactTable8.as_mut_ptr() as *mut c_void, 0, size_of::<CT_Type_2_8B>() * CT8_TABLE_SIZE);
+    memset((*dfc).CompactTable8.as_mut_ptr() as *mut c_void,
+           0,
+           size_of::<CT_Type_2_8B>() * CT8_TABLE_SIZE);
 
     plist = (*dfc).dfcPatterns;
     while !plist.is_null() {
         if (*plist).n == 2 || (*plist).n == 3 {
-            while alpha_cnt < 4 {} {
+            while alpha_cnt < 4 {}
+            {
                 j = 1;
                 k = 0;
                 while j >= 0 {
@@ -672,7 +720,12 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
                     k += 1;
                 }
                 for j in ((*plist).n - 2)..((*plist).n) {
-                    Build_pattern(plist, flag.as_mut_ptr(), temp.as_mut_ptr(), i, j as isize, k);
+                    Build_pattern(plist,
+                                  flag.as_mut_ptr(),
+                                  temp.as_mut_ptr(),
+                                  i,
+                                  j as isize,
+                                  k);
                 }
                 fragment_16 = ((temp[1] as u16) << 8) | temp[0] as u16;
                 let mut crc = crc32::checksum_ieee(fragment_16.to_string().as_bytes());
@@ -687,40 +740,73 @@ unsafe fn DFC_Compile(dfc: *mut DFC_STRUCTURE) -> i32 {
                     }
                     if n == (*dfc).CompactTable2[crc as usize].cnt {
                         (*dfc).CompactTable2[crc as usize].cnt += 1;
-                        (*dfc).CompactTable2[crc as usize].array = DFC_REALLOC((*dfc).CompactTable2[crc as usize].array as *mut c_void,
-                                                                               (*dfc).CompactTable2[crc as usize].cnt as usize,
-                                                                               dfcDataType::DFC_CT_Type_2_Array,
-                                                                               dfcMemoryType::DFC_MEMORY_TYPE__CT2) as *mut CT_Type_2_Array;
-                        (*(*dfc).CompactTable2[crc as usize].array.offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize)).pat = fragment_16 as u32;
-                        (*(*dfc).CompactTable2[crc as usize].array.offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize)).cnt = 1;
-                        (*(*dfc).CompactTable2[crc as usize].array.offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize)).pid =
-                            DFC_MALLOC(size_of::<PID_TYPE>(), dfcMemoryType::DFC_MEMORY_TYPE__CT2) as *mut PID_TYPE;
-                        (*(*(*dfc).CompactTable2[crc as usize].array.offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize)).pid.offset(0)) = (*plist).iid;
-                        (*(*dfc).CompactTable2[crc as usize].array.offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize)).DirectFilter = null();
-                        (*(*dfc).CompactTable2[crc as usize].array.offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize)).CompactTable = null();
+                        (*dfc).CompactTable2[crc as usize].array =
+                            DFC_REALLOC((*dfc).CompactTable2[crc as usize].array as *mut c_void,
+                                        (*dfc).CompactTable2[crc as usize].cnt as usize,
+                                        dfcDataType::DFC_CT_Type_2_Array,
+                                        dfcMemoryType::DFC_MEMORY_TYPE__CT2) as
+                            *mut CT_Type_2_Array;
+                        (*(*dfc).CompactTable2[crc as usize]
+                                .array
+                                .offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize))
+                            .pat = fragment_16 as u32;
+                        (*(*dfc).CompactTable2[crc as usize]
+                                .array
+                                .offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize))
+                            .cnt = 1;
+                        (*(*dfc).CompactTable2[crc as usize]
+                                .array
+                                .offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize))
+                            .pid = DFC_MALLOC(size_of::<PID_TYPE>(), dfcMemoryType::DFC_MEMORY_TYPE__CT2) as
+                                   *mut PID_TYPE;
+                        (*(*(*dfc).CompactTable2[crc as usize]
+                                .array
+                                .offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize))
+                            .pid
+                            .offset(0)) = (*plist).iid;
+                        (*(*dfc).CompactTable2[crc as usize]
+                                .array
+                                .offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize))
+                            .DirectFilter = null();
+                        (*(*dfc).CompactTable2[crc as usize]
+                                .array
+                                .offset(((*dfc).CompactTable2[crc as usize].cnt - 1) as isize))
+                            .CompactTable = null();
                     } else {
                         for m in 0..(*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).cnt {
-                            if (*(*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).pid.offset(m as isize)) == (*plist).iid {
+                            if (*(*(*dfc).CompactTable2[crc as usize].array.offset(n as isize))
+                                .pid
+                                .offset(m as isize)) == (*plist).iid {
                                 break;
                             }
                         }
                         if m == (*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).cnt {
                             (*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).cnt += 1;
                             (*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).cnt =
-                                DFC_REALLOC((*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).pid as *mut c_void,
-                                            (*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).cnt as usize,
-                                            dfcDataType::DFC_PID_TYPE, dfcMemoryType::DFC_MEMORY_TYPE__CT3) as u32;
-                            (*(*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).pid
-                                .offset(((*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).cnt - 1) as isize)) = (*plist).iid;
+                                DFC_REALLOC((*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).pid as
+                                            *mut c_void,
+                                            (*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).cnt as
+                                            usize,
+                                            dfcDataType::DFC_PID_TYPE,
+                                            dfcMemoryType::DFC_MEMORY_TYPE__CT3) as u32;
+                            (*(*(*dfc).CompactTable2[crc as usize].array.offset(n as isize))
+                                .pid
+                                .offset(((*(*dfc).CompactTable2[crc as usize].array.offset(n as isize)).cnt -
+                                         1) as isize)) = (*plist).iid;
                         }
                     }
                 } else {
                     (*dfc).CompactTable2[crc as usize].cnt = 1;
-                    (*dfc).CompactTable2[crc as usize].array = DFC_MALLOC(size_of::<CT_Type_2_Array>(), dfcMemoryType::DFC_MEMORY_TYPE__CT2) as *mut CT_Type_2_Array;
-                    memset((*dfc).CompactTable2[crc as usize].array.offset(0) as *mut c_void, 0, size_of::<CT_Type_2_Array>());
+                    (*dfc).CompactTable2[crc as usize].array = DFC_MALLOC(size_of::<CT_Type_2_Array>(),
+                                                                          dfcMemoryType::DFC_MEMORY_TYPE__CT2) as
+                                                               *mut CT_Type_2_Array;
+                    memset((*dfc).CompactTable2[crc as usize].array.offset(0) as *mut c_void,
+                           0,
+                           size_of::<CT_Type_2_Array>());
                     (*(*dfc).CompactTable2[crc as usize].array.offset(0)).pat = fragment_16 as u32;
                     (*(*dfc).CompactTable2[crc as usize].array.offset(0)).cnt = 1;
-                    (*(*dfc).CompactTable2[crc as usize].array.offset(0)).pid = DFC_MALLOC(size_of::<PID_TYPE>(), dfcMemoryType::DFC_MEMORY_TYPE__CT2) as *mut PID_TYPE;
+                    (*(*dfc).CompactTable2[crc as usize].array.offset(0)).pid =
+                        DFC_MALLOC(size_of::<PID_TYPE>(), dfcMemoryType::DFC_MEMORY_TYPE__CT2) as *mut PID_TYPE;
                     (*(*(*dfc).CompactTable2[crc as usize].array.offset(0)).pid.offset(0)) = (*plist).iid;
                     (*(*dfc).CompactTable2[crc as usize].array.offset(0)).DirectFilter = null();
                     (*(*dfc).CompactTable2[crc as usize].array.offset(0)).CompactTable = null();
@@ -817,11 +903,11 @@ unsafe fn Progressive_Filtering(dfc: *const DFC_STRUCTURE,
     matches
 }
 
-unsafe fn DFC_Search(dfc: *const DFC_STRUCTURE,
-                     buf: *const u8,
-                     buflen: usize,
-                     match_fn: fn(*const u8, *const u32, usize))
-                     -> u32 {
+pub unsafe fn DFC_Search(dfc: *const DFC_STRUCTURE,
+                         buf: *const u8,
+                         buflen: usize,
+                         match_fn: fn(*const u8, *const u32, usize))
+                         -> u32 {
     let mut matches = 0;
 
     if buflen <= 0 {
@@ -878,7 +964,7 @@ unsafe fn init_xlatcase() {
     }
 }
 
-unsafe fn ConvertCaseEx(d: *mut u8, s: *const u8, m: isize) {
+unsafe fn ConvertCaseEx(d: *mut u8, s: *const u8, m: usize) {
     for i in 0..m {
         let pos: u8 = s.offset(i as isize) as u8;
         *d.offset(i as isize) = xlatcase[pos as usize] as u8;
@@ -1064,7 +1150,8 @@ unsafe fn DFC_InitHashAdd(ctx: *const DFC_STRUCTURE, p: *mut DFC_PATTERN) -> i32
     let mut t = *(*ctx).init_hash.offset(hash as isize) as *mut DFC_PATTERN;
 
     // get the list tail
-    while !t.is_null() {} {
+    while !t.is_null() {}
+    {
         tt = t;
         t = (*t).next;
     }
